@@ -21,9 +21,15 @@ const generateBookingCode = () =>
   "BK" + Math.floor(100000 + Math.random() * 900000);
 
 const WalkInManagement = () => {
+  const {
+    addBooking,
+    getSlotConfig,
+    getWalkInRemaining,
+    bookings,
+    walkInPool,
+  } = useBookings();
   const navigate = useNavigate();
   const { isAdminLoggedIn, adminBranchCode, adminBranchName } = useAdmin();
-  const { addBooking, getSlotConfig } = useBookings();
 
   const [name, setName] = useState("");
   const [serviceId, setServiceId] = useState("");
@@ -41,13 +47,27 @@ const WalkInManagement = () => {
 
   const handleSubmit = () => {
     setError("");
+
     if (!name.trim() || !serviceId || !timeSlot) {
       setError("All fields are required.");
       return;
     }
+
     const service = getServiceById(serviceId);
     if (!service) {
       setError("Invalid service selected.");
+      return;
+    }
+
+    const remainingWalkIn = getWalkInRemaining(
+      adminBranchCode,
+      serviceId,
+      today,
+      timeSlot,
+    );
+
+    if (remainingWalkIn <= 0) {
+      setError("Walk-in limit reached");
       return;
     }
 
@@ -71,13 +91,24 @@ const WalkInManagement = () => {
     };
 
     addBooking(booking);
-    toast.success(
-      "Walk-in booking created successfully. Ready for next entry.",
-    );
+
+    toast.success("Walk-in booking created successfully.");
     setName("");
     setServiceId("");
     setTimeSlot("");
   };
+  const remainingWalkIn = getWalkInRemaining(
+    adminBranchCode,
+    serviceId,
+    today,
+    timeSlot,
+  );
+
+  const totalAllowed =
+    (config.walkInCapacity !== undefined ? config.walkInCapacity : 6) +
+    (walkInPool[`${adminBranchCode}|${today}|${timeSlot}`] || 0);
+
+  const walkInCount = totalAllowed - remainingWalkIn;
 
   return (
     <AdminShell title="Walk-In Management">
@@ -146,6 +177,13 @@ const WalkInManagement = () => {
               </SelectContent>
             </Select>
           </div>
+
+          {serviceId && timeSlot && (
+            <p className="text-xs text-muted-foreground">
+              Walk-in: {walkInCount} / {totalAllowed} · Remaining:{" "}
+              {remainingWalkIn}
+            </p>
+          )}
 
           {error && (
             <p className="text-sm text-destructive font-medium">{error}</p>

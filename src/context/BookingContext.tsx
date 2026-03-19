@@ -77,7 +77,12 @@ interface BookingContextType {
   isSlotFrozen: (date: string, timeSlot: string, branchCode: string) => boolean;
   // Walk-in pool
   walkInPool: Record<string, number>;
-  getWalkInRemaining: (branchCode: string, serviceId: string) => number;
+  getWalkInRemaining: (
+    branchCode: string,
+    serviceId: string,
+    date: string,
+    timeSlot: string,
+  ) => number;
 }
 
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
@@ -98,7 +103,7 @@ const DEFAULT_SLOT_CONFIG: SlotConfig = {
   timeSlots: DEFAULT_TIME_SLOTS,
   capacity: 20,
   serviceAvailability: {},
-  walkInCapacity: 0,
+  walkInCapacity: 6,
 };
 
 export const BookingProvider = ({ children }: { children: ReactNode }) => {
@@ -118,18 +123,17 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
 
   const addBooking = useCallback((booking: Booking) => {
     setBookings((prev) => [booking, ...prev]);
-    const key = slotKey({
-      date: booking.date,
-      timeSlot: booking.timeSlot,
-      branchCode: booking.branchCode,
-    });
-    setSlotCounts((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 }));
-    // If walk-in, decrement walk-in pool
-    if (booking.isWalkIn) {
-      const wpKey = `${booking.branchCode}|${booking.serviceId}`;
-      setWalkInPool((prev) => ({
+
+    if (!booking.isWalkIn) {
+      const key = slotKey({
+        date: booking.date,
+        timeSlot: booking.timeSlot,
+        branchCode: booking.branchCode,
+      });
+
+      setSlotCounts((prev) => ({
         ...prev,
-        [wpKey]: Math.max(0, (prev[wpKey] || 0) - 1),
+        [key]: (prev[key] || 0) + 1,
       }));
     }
   }, []);
@@ -143,10 +147,12 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
           timeSlot: b.timeSlot,
           branchCode: b.branchCode,
         });
-        setSlotCounts((sc) => ({
-          ...sc,
-          [key]: Math.max(0, (sc[key] || 0) - 1),
-        }));
+        if (!b.isWalkIn) {
+          setSlotCounts((sc) => ({
+            ...sc,
+            [key]: Math.max(0, (sc[key] || 0) - 1),
+          }));
+        }
         return { ...b, status: "Cancelled" };
       }),
     );
@@ -209,22 +215,26 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
     (slot: FrozenSlot) => {
       setFrozenSlots((prev) => {
         if (prev.some((s) => frozenKey(s) === frozenKey(slot))) return prev;
+
+        // ✅ ONLY run transfer when actually freezing
+        const key = slotKey(slot);
+        const filled = slotCounts[key] || 0;
+        const config =
+          slotConfigs[slot.branchCode]?.[slot.date] || DEFAULT_SLOT_CONFIG;
+
+        const remaining = Math.max(0, config.capacity - filled);
+
+        if (remaining > 0) {
+          const wpKey = `${slot.branchCode}|${slot.date}|${slot.timeSlot}`;
+
+          setWalkInPool((prevPool) => ({
+            ...prevPool,
+            [wpKey]: (prevPool[wpKey] || 0) + remaining,
+          }));
+        }
+
         return [...prev, slot];
       });
-      // Transfer remaining capacity to walk-in pool (simplified: add remaining to all services)
-      const key = slotKey(slot);
-      const filled = slotCounts[key] || 0;
-      const config =
-        slotConfigs[slot.branchCode]?.[slot.date] || DEFAULT_SLOT_CONFIG;
-      const remaining = Math.max(0, config.capacity - filled);
-      if (remaining > 0) {
-        // Add to a generic walk-in pool for the branch
-        const wpKey = `${slot.branchCode}|_walkin_pool`;
-        setWalkInPool((prev) => ({
-          ...prev,
-          [wpKey]: (prev[wpKey] || 0) + remaining,
-        }));
-      }
     },
     [slotCounts, slotConfigs],
   );
@@ -247,19 +257,30 @@ export const BookingProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const getWalkInRemaining = useCallback(
-    (branchCode: string, serviceId: string) => {
-      const config =
-        slotConfigs[branchCode]?.[new Date().toISOString().split("T")[0]] ||
-        DEFAULT_SLOT_CONFIG;
-      // Base walk-in capacity from config + frozen slot transfers
-      const poolKey = `${branchCode}|_walkin_pool`;
-      const serviceKey = `${branchCode}|${serviceId}`;
-      const base = config.walkInCapacity;
-      const fromFrozen = walkInPool[poolKey] || 0;
-      const used = -(walkInPool[serviceKey] || 0); // negative means used
-      return base + fromFrozen + (walkInPool[serviceKey] || 0);
+    (branchCode: string, serviceId: string, date: string, timeSlot: string) => {
+      const config = slotConfigs[branchCode]?.[date] || DEFAULT_SLOT_CONFIG;
+
+      const poolKey = `${branchCode}|${date}|${timeSlot}`;
+
+      const base =
+        config.walkInCapacity !== undefined ? config.walkInCapacity : 6;
+
+      const extra = walkInPool[poolKey] || 0;
+
+      const totalAllowed = base + extra;
+
+      const used = bookings.filter(
+        (b) =>
+          b.isWalkIn &&
+          b.branchCode === branchCode &&
+          b.date === date &&
+          b.timeSlot === timeSlot &&
+          b.serviceId === serviceId,
+      ).length;
+
+      return Math.max(0, totalAllowed - used);
     },
-    [slotConfigs, walkInPool],
+    [slotConfigs, walkInPool, bookings],
   );
 
   return (

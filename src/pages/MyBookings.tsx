@@ -226,7 +226,9 @@ const MyBookings = () => {
                     )}
                     {/* Cancel */}
                     <div className="ml-auto">
-                      {canCancel(b) && ciStatus !== "checked-in" ? (
+                      {canCancel(b) &&
+                      ciStatus !== "checked-in" &&
+                      ciStatus !== "absent" ? (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button

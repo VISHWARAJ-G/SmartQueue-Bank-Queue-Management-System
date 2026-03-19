@@ -1,0 +1,19 @@
+# Global Ignore
+.DS_Store
+Thumbs.db
+
+# Ignore environment files
+.env
+
+# Ignore node_modules in both frontend and backend
+node_modules
+
+# Ignore build folders (React & others)
+build
+dist
+
+# Ignore log files
+*.log
+
+# Editor folders
+.vscode/

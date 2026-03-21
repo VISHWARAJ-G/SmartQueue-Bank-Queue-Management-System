@@ -75,14 +75,50 @@ When a slot is frozen:
 
 ## 🏗️ Tech Stack
 
-* ⚛️ React + TypeScript
-* ⚡ Vite (Build Tool)
-* 🎨 Tailwind CSS
-* 🧠 Context API (State Management)
-* 🎭 Framer Motion (Animations)
-* 🔔 Sonner (Notifications)
+### Current Implementation
+
+* ⚛️ **React + TypeScript**
+* ⚡ **Vite** (Build Tool)
+* 🎨 **Tailwind CSS**
+* 🧠 **Context API** (State Management)
+* 🎭 **Framer Motion** (Animations)
+* 🔔 **Sonner** (Notifications)
 
 ---
+
+## 🚀 Future Scope (Enterprise-Level Architecture)
+
+As the system scales to an enterprise-grade solution, the architecture can be expanded for better performance, maintainability, and scalability:
+
+### Frontend
+
+* ⚛️ **React** (TypeScript / JavaScript)
+* 🎨 Tailwind CSS (or scalable design systems)
+
+### Backend
+
+* 🟢 **Node.js** with **Express.js**
+* RESTful APIs / Microservices architecture (if required)
+
+### Database
+
+* 🐘 **PostgreSQL** (via Supabase or dedicated DB infrastructure)
+* 🔗 **Supabase** (Authentication, Realtime, Storage)
+
+---
+
+## 📈 Scalability Vision
+
+* Modular architecture for independent feature scaling
+* API-driven design for frontend/backend separation
+* Cloud-native deployment (Vercel + Backend services)
+* Secure authentication & role-based access control
+* Real-time capabilities using Supabase or WebSockets
+
+---
+
+> ⚡ This setup ensures the project can evolve from a lightweight application into a fully scalable enterprise system without major rewrites.
+
 
 ## 📁 Project Structure
 
